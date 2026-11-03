@@ -1,0 +1,17 @@
+# Core: ingest, thumbnails, filters
+pillow>=10
+pillow-heif>=0.16
+numpy<2.1
+opencv-python-headless>=4.9
+imagehash>=4.3
+pyyaml>=6
+pandas>=2
+scikit-learn>=1.4
+tqdm>=4.66
+# GPU models: CLIP embeddings, aesthetic and quality scores
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.5.1
+torchvision==0.20.1
+open_clip_torch>=2.24
+pyiqa>=0.1.13
+pytest>=8

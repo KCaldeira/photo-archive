@@ -1,0 +1,17 @@
+# Paths and settings for the photo-selection pipeline. Paths may use ~.
+
+# Extracted Google Takeout tree (contains "Takeout/Google Photos/..." folders).
+# Kept on F: because it is large; read-only as far as this pipeline is concerned.
+takeout_dir: /mnt/f/PhotoArchive/extracted
+
+# SQLite DB, thumbnails, embeddings, contact sheets. Kept on the WSL ext4 disk
+# (fast, and SQLite locking is unreliable on /mnt/* drives). Gitignored.
+work_dir: ~/photo-archive/work
+
+# Worker processes for ingest (machine has 16 cores; leave some free).
+workers: 14
+
+# Long edge, in pixels, of stored thumbnails and of the image used for
+# sharpness/exposure statistics.
+thumb_size: 512
+analysis_size: 1024

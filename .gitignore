@@ -1,0 +1,12 @@
+# Photos and all generated data stay out of git
+work/
+data/
+*.sqlite
+*.db
+*.zip
+__pycache__/
+.pytest_cache/
+.venv/
+
+.vscode/*
+!.vscode/settings.json
