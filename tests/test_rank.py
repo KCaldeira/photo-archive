@@ -34,11 +34,11 @@ def test_rank(tmp_path):
     # Event 2 (a day later): a screenshot, a low-res photo, a favorite
     _photo(con, "shot", t0 + 86400, 3.0, format="PNG", camera_model=None)
     _photo(con, "small", t0 + 86410, 7.0, megapixels=1.0)
-    _photo(con, "junk", t0 + 86420, 5.0, zs={"junk_document": 0.9, "people": 0.1})
+    _photo(con, "junk", t0 + 86420, 4.0, zs={"junk_document": 0.9, "people": 0.1})
     _photo(con, "fav", t0 + 86430, 3.0, favorited=1)
     con.commit()
 
-    res = run_rank(cfg)
+    res = run_rank(cfg, {"recompute_zeroshot": False})
     r = {row["sha1"]: dict(row) for row in con.execute("SELECT * FROM rank")}
     assert r["shot"]["excluded"] == "screenshot"
     assert r["small"]["excluded"] == "low-res"

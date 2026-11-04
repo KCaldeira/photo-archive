@@ -21,8 +21,12 @@ analysis_size: 1024
 rank:
   min_megapixels: 3.0       # 8x10 print at 200 dpi needs 3.2 MP
   junk_threshold: 0.5       # summed CLIP probability of screenshot/document/slide/... labels
+  junk_rescue: 9.3          # ... but keep it if LAION aesthetic + TOPIQ-IAA reaches this
   burst_seconds: 60
-  burst_similarity: 0.90
+  burst_similarity: 0.93
+  burst_extra_every: 25     # big bursts keep 1 + size // 25 distinct winners
+  copy_similarity: 0.97     # near-identical at any time (resized copies, re-shares): keep one ...
+  copy_dhash_bits: 6        # ... only if their pixel fingerprints also match (<= 6 of 64 bits differ)
   event_gap_hours: 3.0
   event_gap_km: 30.0
   weights:
@@ -30,10 +34,16 @@ rank:
     iaa: 0.5                # TOPIQ aesthetic (AVA)
     iqa: 0.7                # TOPIQ technical quality
     sharpness: 0.3
-    people: 0.3             # tagged with a named person in Google Photos
+    named_people: 0.3       # tagged with a named person in Google Photos
     favorited: 2.0
     edited: 0.7             # you edited it in Google Photos
+    junk: -1.0              # x summed junk probability (for photos rescued from exclusion)
+    zs_artwork: -2.0        # x probability it is a photo of someone else's painting
+    zs_pet: 0.5
+    zs_people: 0.3
+    zs_group: 0.3
+    megapixels: 0.2         # prefer the full-resolution copy
   per_event_factor: 0.6
   max_per_event: 12
-  min_composite: 0.0
+  min_composite: 1.0       # weaker event picks are dropped
   global_top_frac: 0.01
