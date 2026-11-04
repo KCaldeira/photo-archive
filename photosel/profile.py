@@ -159,6 +159,9 @@ def metric_values(df: pd.DataFrame, emb: dict, prof: dict, cache: Path) -> pd.Da
         m["concept_" + name] = v
     good = [c for c in prof.get("subject_concepts", []) if "concept_" + c in m]
     m["subject"] = m[["concept_" + c for c in good]].max(axis=1) if good else np.nan
+    for c, f in (prof.get("subject_partial") or {}).items():
+        if "concept_" + c in m:
+            m["subject"] = np.fmax(m["subject"], f * m["concept_" + c])
     # People prominence: largest person box as a fraction of the frame; crowds of small figures are fine.
     crowd = prof.get("crowd", {"min_persons": 8, "max_area": 0.06})
     is_crowd = (df["n_persons"] >= crowd["min_persons"]) & (df["max_area"] <= crowd["max_area"])

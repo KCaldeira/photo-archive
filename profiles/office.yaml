@@ -43,8 +43,16 @@ concepts:                 # CLIP prompt ensembles, each scored against a neutral
     - a portrait of a person
     - a couple or family posing for the camera
     - a selfie
-    - a few people standing in front of a view
+    - a close-up of a person's face
+    - people smiling at the camera
+  interior:
+    - a room interior
+    - inside a house, office or restaurant
+  architecture:
+    - a photo of a historic building or monument
+    - a cityscape or street scene
 subject_concepts: [landscape, animal, texture]
+subject_partial: {architecture: 0.7}   # neutral-ish: partial subject credit
 
 metrics:
   aesthetic:  {kind: up, weight: 1.0}                           # LAION, percentile
@@ -62,6 +70,7 @@ metrics:
     fallback: {source: focus_proxy, scale: percentile, lo: 0.05, hi: 0.40}
   people:     {scale: raw, kind: down, lo: 0.02, hi: 0.15, weight: 1.5}  # largest person, fraction of frame
   portrait:   {source: concept_portrait, scale: raw, kind: down, lo: 0.4, hi: 0.9, weight: 1.0}
+  indoor:     {source: concept_interior, scale: raw, kind: down, lo: 0.5, hi: 0.9, weight: 0.7}
   cliche:     {source: concept_sunset, scale: raw, kind: down, lo: 0.5, hi: 0.95, eps: 0.3, weight: 0.5}
   art_junk:   {scale: raw, kind: down, lo: 0.3, hi: 0.8, weight: 1.0}
   megapixels: {scale: raw, kind: up, lo: 4, hi: 10, weight: 0.7}
