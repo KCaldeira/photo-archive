@@ -64,6 +64,31 @@ CREATE TABLE IF NOT EXISTS photos (
     has_thumb    INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS photos_taken ON photos(taken_ts);
+
+-- GPU stage (embed.py): cached, expensive
+CREATE TABLE IF NOT EXISTS clip (
+    sha1 TEXT PRIMARY KEY,
+    emb  BLOB                    -- float16 CLIP ViT-L/14 image embedding, L2-normalized
+);
+CREATE TABLE IF NOT EXISTS scores (
+    sha1      TEXT PRIMARY KEY,
+    aesthetic REAL,              -- LAION aesthetic predictor (~1..10)
+    iqa       REAL,              -- TOPIQ-NR technical quality (~0..1)
+    iaa       REAL,              -- TOPIQ-IAA aesthetic (~1..10)
+    zeroshot  TEXT               -- JSON {label: prob}
+);
+
+-- Ranking stage (rank.py): cheap, rebuilt on every run from the tables above
+CREATE TABLE IF NOT EXISTS rank (
+    sha1       TEXT PRIMARY KEY,
+    excluded   TEXT,             -- reason, or NULL if kept
+    burst_id   INTEGER,
+    burst_size INTEGER,
+    burst_best INTEGER,          -- 1 if best of its burst
+    event_id   INTEGER,
+    composite  REAL,             -- weighted score (z-units)
+    finalist   INTEGER DEFAULT 0
+);
 """
 
 

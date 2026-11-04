@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -17,6 +17,7 @@ class Config:
     workers: int = 14
     thumb_size: int = 512
     analysis_size: int = 1024
+    rank: dict = field(default_factory=dict)
 
     @property
     def db_path(self) -> Path:

@@ -18,6 +18,12 @@ def main(argv=None):
     p.add_argument("--limit", type=int, help="process at most N new images (for a quick trial)")
     p.add_argument("--workers", type=int)
 
+    p = sub.add_parser("embed", help="GPU: CLIP embeddings, aesthetic/quality scores, zero-shot labels")
+    p.add_argument("--limit", type=int)
+    p.add_argument("--skip-iqa", action="store_true")
+
+    sub.add_parser("rank", help="filters, bursts, events, composite score, finalists (fast)")
+
     sub.add_parser("stats", help="summarize the database")
 
     p = sub.add_parser("sheet", help="make numbered contact sheets")
@@ -34,6 +40,14 @@ def main(argv=None):
     if a.cmd == "ingest":
         from .ingest import run_ingest
         print(json.dumps(run_ingest(cfg, limit=a.limit), indent=2))
+    elif a.cmd == "embed":
+        from .embed import run_clip, run_iqa
+        print("clip:", run_clip(cfg, limit=a.limit))
+        if not a.skip_iqa:
+            print("iqa:", run_iqa(cfg, limit=a.limit))
+    elif a.cmd == "rank":
+        from .rank import run_rank
+        print(json.dumps(run_rank(cfg, cfg.rank), indent=2))
     elif a.cmd == "stats":
         from .report import print_stats
         print_stats(cfg)
@@ -43,9 +57,18 @@ def main(argv=None):
         con = connect(cfg.db_path)
         n = a.sample or a.limit
         rows = [dict(r) for r in con.execute(
-            f"SELECT sha1, path, taken_at, megapixels, sharpness FROM photos "
-            f"WHERE has_thumb=1 AND ({a.where}) ORDER BY {a.order} LIMIT ?", (n,))]
-        caps = [f"{(r['taken_at'] or '')[:10]} {r['megapixels'] or 0:.0f}MP s{r['sharpness'] or 0:.0f}" for r in rows]
+            f"SELECT p.sha1, p.path, p.taken_at, p.megapixels, s.aesthetic, r.composite, r.excluded "
+            f"FROM photos p LEFT JOIN scores s USING(sha1) LEFT JOIN rank r USING(sha1) "
+            f"WHERE p.has_thumb=1 AND ({a.where}) ORDER BY {a.order} LIMIT ?", (n,))]
+
+        def cap(r):
+            c = f"{(r['taken_at'] or '')[:10]} {r['megapixels'] or 0:.0f}MP"
+            if r["composite"] is not None:
+                c += f" c{r['composite']:+.1f} a{r['aesthetic'] or 0:.1f}"
+            if r["excluded"]:
+                c = f"{r['excluded']} {c[5:10]}"
+            return c
+        caps = [cap(r) for r in rows]
         for s in make_sheets(cfg, rows, a.name, caps):
             print(s)
 
