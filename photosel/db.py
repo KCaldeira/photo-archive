@@ -78,6 +78,27 @@ CREATE TABLE IF NOT EXISTS scores (
     zeroshot  TEXT               -- JSON {label: prob}
 );
 
+-- Person detection (detect.py): how much of the frame people occupy
+CREATE TABLE IF NOT EXISTS persons (
+    sha1       TEXT PRIMARY KEY,
+    n_persons  INTEGER,          -- confident person boxes (score >= 0.6)
+    max_area   REAL,             -- largest person box, fraction of frame
+    total_area REAL,             -- sum of person boxes, fraction of frame (capped at 1)
+    boxes      TEXT              -- JSON [[x0,y0,x1,y1], ...] normalized, up to 20
+);
+
+-- Image structure (structure.py): coarse-scale metrics from thumbnails, focus map from originals
+CREATE TABLE IF NOT EXISTS structure (
+    sha1          TEXT PRIMARY KEY,
+    coarse_contrast REAL,        -- std of luma at 32 px (large-scale tonal structure)
+    coarse_edges  REAL,          -- mean gradient magnitude at 64 px
+    coarse_ratio  REAL,          -- coarse_edges / fine edge energy at 512 px (simplicity vs clutter)
+    tonal_range   REAL,          -- luma p95 - p5 at 64 px
+    focus_max     REAL,          -- 95th percentile of tile sharpness on the original (stage 2)
+    focus_frac    REAL,          -- fraction of tiles that are sharp (stage 2)
+    small_aesthetic REAL         -- LAION aesthetic of the photo shrunk to ~48 px (stage 2)
+);
+
 -- Ranking stage (rank.py): cheap, rebuilt on every run from the tables above
 CREATE TABLE IF NOT EXISTS rank (
     sha1       TEXT PRIMARY KEY,
@@ -93,7 +114,7 @@ CREATE TABLE IF NOT EXISTS rank (
 
 
 def connect(db_path: Path) -> sqlite3.Connection:
-    con = sqlite3.connect(db_path)
+    con = sqlite3.connect(db_path, timeout=120)  # several stages may write concurrently
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA synchronous=NORMAL")

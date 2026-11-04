@@ -62,3 +62,28 @@ def label_probs(emb: np.ndarray, labels: dict[str, str], cache: Path) -> dict[st
     p = np.exp(logits)
     p /= p.sum(axis=1, keepdims=True)
     return {k: p[:, i] for i, k in enumerate(labels)}
+
+
+NEUTRAL = ["a photo", "a picture", "an image"]
+
+
+def concept_probs(emb: np.ndarray, concepts: dict[str, list[str]], cache: Path,
+                  neutral: list[str] | None = None, scale: float = 100.0) -> dict[str, np.ndarray]:
+    """Probability-like score per concept: a binary contrast of the concept vs a neutral caption.
+
+    Each concept is a prompt ensemble (several phrasings averaged in CLIP text space), which is
+    more stable than one prompt. Unlike `label_probs`, concepts do not compete with each other,
+    so adding a concept never changes the others' scores.
+    """
+    neutral = neutral or NEUTRAL
+
+    def centroid(prompts):
+        t = text_embeddings(prompts, cache).mean(axis=0)
+        return t / np.linalg.norm(t)
+
+    s_n = emb @ centroid(neutral)
+    out = {}
+    for name, prompts in concepts.items():
+        d = scale * (emb @ centroid(prompts) - s_n)
+        out[name] = 1.0 / (1.0 + np.exp(-d))
+    return out

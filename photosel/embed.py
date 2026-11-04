@@ -143,6 +143,41 @@ def run_clip(cfg: Config, batch_size: int = 32, limit: int | None = None) -> int
     return len(todo)
 
 
+def run_small_aesthetic(cfg: Config, sha1s: list[str], edge: int = 48, batch_size: int = 32) -> int:
+    """LAION aesthetic of each photo shrunk to `edge` px and enlarged again: does it read from across a room?"""
+    import open_clip
+
+    con = connect(cfg.db_path)
+    done = {s for (s,) in con.execute("SELECT sha1 FROM structure WHERE small_aesthetic IS NOT NULL")}
+    todo = [s for s in sha1s if s not in done]
+    print(f"small-view aesthetic: {len(todo)} photos")
+    if not todo:
+        return 0
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model, _, preprocess = open_clip.create_model_and_transforms("ViT-L-14", pretrained="openai")
+    model = model.to(device).eval()
+    aest = _aesthetic_model(cfg.work_dir / "models", device)
+
+    def shrink(img):
+        w, h = img.size
+        s = edge / max(w, h)
+        small = img.resize((max(1, round(w * s)), max(1, round(h * s))), Image.BOX)
+        return preprocess(small.resize((w, h), Image.BICUBIC))
+
+    dl = DataLoader(Thumbs(cfg, todo, shrink), batch_size=batch_size, num_workers=3, worker_init_fn=_loader_init)
+    for imgs, idx in tqdm(dl, unit="batch"):
+        with torch.no_grad():
+            e = model.encode_image(imgs.to(device)).float()
+            a = aest(e / e.norm(dim=-1, keepdim=True)).squeeze(1).cpu().numpy()
+        con.executemany(
+            "INSERT INTO structure (sha1, small_aesthetic) VALUES (?, ?) "
+            "ON CONFLICT(sha1) DO UPDATE SET small_aesthetic=excluded.small_aesthetic",
+            [(todo[i], float(a[j])) for j, i in enumerate(idx.tolist())])
+        con.commit()
+    con.close()
+    return len(todo)
+
+
 def run_iqa(cfg: Config, metrics=("topiq_nr", "topiq_iaa"), limit: int | None = None) -> int:
     """No-reference quality (technical) and aesthetic models from pyiqa."""
     import pyiqa

@@ -1,0 +1,67 @@
+# Office wall prints: framed, seen from across a room.
+# Wanted: landscapes, animals, natural abstracts (rock, moss, lichen, clouds, ice, water),
+# large-scale structure that reads from a distance, sharp somewhere.
+# Not wanted: prominent faces, individuals or small groups (crowds / distant figures are fine),
+# sunsets and similar cliches, photos of someone else's art, junk.
+#
+# Each metric: source column (see profile.metric_values), scale (percentile | raw),
+# kind (up = more is better, down = less is better), ramp lo..hi, floor eps, weight.
+# A "must not be bad" metric saturates at 1 once adequate (only deficiency is penalized).
+name: office
+p: 0                      # nominal power-mean exponent (0 = geometric mean)
+eps: 0.05                 # desirability floor: a score, not a hard filter
+shortlist: 2000           # stage 1 -> stage 2 (expensive metrics on originals)
+target: 300               # diverse candidates for review
+monte_carlo:
+  draws: 1000
+  concentration: 20       # Dirichlet spread of weights around nominal (higher = tighter)
+  p_range: [-2.0, 0.5]    # from near-minimum to between geometric and arithmetic
+diversity:
+  lambda: 1.0
+  sim_floor: 0.75         # CLIP similarity above which a photo counts as "like one already picked"
+crowd: {min_persons: 8, max_area: 0.06}
+
+concepts:                 # CLIP prompt ensembles, each scored against a neutral "a photo"
+  landscape:
+    - a landscape photograph
+    - a scenic vista of mountains, valleys, lakes or coastline
+    - a wide view of nature
+  animal:
+    - a wildlife photograph of an animal
+    - a photo of a bird
+    - an animal in its natural habitat
+  texture:
+    - an abstract close-up of rock texture
+    - moss and lichen close-up
+    - dramatic clouds filling the sky
+    - patterns in ice, water or sand
+    - close-up of tree bark or leaves
+  sunset:
+    - a sunset or sunrise
+    - the sun setting over the horizon with orange sky
+  portrait:
+    - a portrait of a person
+    - a couple or family posing for the camera
+    - a selfie
+    - a few people standing in front of a view
+subject_concepts: [landscape, animal, texture]
+
+metrics:
+  aesthetic:  {kind: up, weight: 1.0}                           # LAION, percentile
+  iaa:        {kind: up, weight: 0.5}                           # TOPIQ aesthetic, percentile
+  quality:    {source: iqa, kind: up, lo: 0.05, hi: 0.40, weight: 0.7}   # technical: only the bottom penalized
+  subject:    {scale: raw, kind: up, lo: 0.3, hi: 0.9, eps: 0.2, weight: 1.0}
+  distance:   {kind: up, weight: 1.0}                           # reads from across a room
+  focus:                                                        # some part sharp at print scale
+    source: focus
+    scale: raw
+    kind: up
+    lo: 0.01
+    hi: 0.10
+    weight: 1.0
+    fallback: {source: focus_proxy, scale: percentile, lo: 0.05, hi: 0.40}
+  people:     {scale: raw, kind: down, lo: 0.02, hi: 0.15, weight: 1.5}  # largest person, fraction of frame
+  portrait:   {source: concept_portrait, scale: raw, kind: down, lo: 0.4, hi: 0.9, weight: 1.0}
+  cliche:     {source: concept_sunset, scale: raw, kind: down, lo: 0.5, hi: 0.95, eps: 0.3, weight: 0.5}
+  art_junk:   {scale: raw, kind: down, lo: 0.3, hi: 0.8, weight: 1.0}
+  megapixels: {scale: raw, kind: up, lo: 4, hi: 10, weight: 0.7}
