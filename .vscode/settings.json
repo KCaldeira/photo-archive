@@ -1,18 +1,17 @@
 {
-  // Dark neutral graphite window tint so this repo's VS Code window is easy to tell apart
-  // (neutral gray also avoids biasing colour judgement when looking at photos).
+  // Dark chartreuse window tint so this repo's VS Code window is easy to tell apart.
   "workbench.colorCustomizations": {
-    "titleBar.activeBackground": "#33363b",
-    "titleBar.activeForeground": "#eceef1",
-    "titleBar.inactiveBackground": "#26282c",
-    "titleBar.inactiveForeground": "#b0b4ba",
-    "activityBar.background": "#33363b",
-    "activityBar.foreground": "#eceef1",
-    "statusBar.background": "#33363b",
-    "statusBar.foreground": "#eceef1",
-    "sideBar.background": "#1f2124",
-    "editor.background": "#18191c",
-    "panel.background": "#18191c",
-    "terminal.background": "#18191c"
+    "titleBar.activeBackground": "#2f4a14",
+    "titleBar.activeForeground": "#eef5e4",
+    "titleBar.inactiveBackground": "#233810",
+    "titleBar.inactiveForeground": "#b6c4a2",
+    "activityBar.background": "#2f4a14",
+    "activityBar.foreground": "#eef5e4",
+    "statusBar.background": "#2f4a14",
+    "statusBar.foreground": "#eef5e4",
+    "sideBar.background": "#1a2a0d",
+    "editor.background": "#141f0a",
+    "panel.background": "#141f0a",
+    "terminal.background": "#141f0a"
   }
 }
