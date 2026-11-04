@@ -10,9 +10,9 @@ Runs on the desktop (`SmallPinkDot`: 16 cores, GTX 1650 4 GB, CUDA 12.3 driver).
 
 | What | Path | Notes |
 | --- | --- | --- |
-| Takeout zips | `/mnt/f/PhotoArchive/takeout_zips/` | F: has the free space; C: is nearly full |
-| Extracted Takeout | `/mnt/f/PhotoArchive/extracted/` | never modified by the pipeline |
-| Selected originals | `/mnt/f/PhotoArchive/selects/<set>/` | output of export |
+| Takeout zips | `/mnt/f/photo takeout/takeout-*.zip` | F: has the free space; C: is nearly full |
+| Extracted Takeout | `/mnt/f/photo takeout/extracted/` | never modified by the pipeline |
+| Selected originals | `/mnt/f/photo takeout/selects/<set>/` | output of export |
 | Work dir (DB, thumbs, sheets) | `~/photo-archive/work/` | gitignored; on ext4 for speed and SQLite locking |
 
 Paths live in `config.yaml`.

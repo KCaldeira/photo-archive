@@ -19,7 +19,8 @@ from pathlib import Path
 
 IMAGE_EXT = {".jpg", ".jpeg", ".heic", ".heif", ".png", ".webp", ".tif", ".tiff", ".gif", ".bmp"}
 RAW_EXT = {".dng", ".cr2", ".cr3", ".nef", ".arw", ".orf", ".rw2", ".raf"}
-VIDEO_EXT = {".mp4", ".mov", ".m4v", ".avi", ".3gp", ".mkv", ".mts", ".m2ts", ".wmv", ".mpg"}
+VIDEO_EXT = {".mp", ".mp~2",  # Pixel motion-photo clips
+             ".mp4", ".mov", ".m4v", ".avi", ".3gp", ".mkv", ".mts", ".m2ts", ".wmv", ".mpg"}
 
 SUPPLEMENTAL = "supplemental-metadata"
 EDITED_SUFFIXES = ("-edited", "-bearbeitet", "-modifié", "-editado", "-modificato")

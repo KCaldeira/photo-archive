@@ -1,8 +1,8 @@
 # Paths and settings for the photo-selection pipeline. Paths may use ~.
 
 # Extracted Google Takeout tree (contains "Takeout/Google Photos/..." folders).
-# Kept on F: because it is large; read-only as far as this pipeline is concerned.
-takeout_dir: /mnt/f/PhotoArchive/extracted
+# Kept on F: (F:\photo takeout\extracted) because it is large; the pipeline never writes there.
+takeout_dir: "/mnt/f/photo takeout/extracted"
 
 # SQLite DB, thumbnails, embeddings, contact sheets. Kept on the WSL ext4 disk
 # (fast, and SQLite locking is unreliable on /mnt/* drives). Gitignored.
