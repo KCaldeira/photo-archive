@@ -174,6 +174,10 @@ def metric_values(df: pd.DataFrame, emb: dict, prof: dict, cache: Path, taste=No
     m["people"] = df["max_area"].where(~is_crowd, 0.0)
     m["art_junk"] = np.maximum(labels["artwork"], junk)
     m["megapixels"] = df["megapixels"]
+    # Shot on a preferred (dedicated) camera rather than a phone: 1 or 0, by EXIF make.
+    pref = [c.lower() for c in prof.get("preferred_cameras", [])]
+    make = df["camera_make"].fillna("").str.lower()
+    m["camera"] = make.isin(pref).astype(float) if pref else np.nan
     # Reads from a distance: large-scale contrast and edges (stage 1), plus small-view aesthetic (stage 2).
     m["distance_coarse"] = (pct(df["coarse_contrast"]) + pct(df["coarse_edges"]) + pct(df["tonal_range"])
                             + pct(df["coarse_ratio"])) / 4

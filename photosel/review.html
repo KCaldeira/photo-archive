@@ -99,7 +99,7 @@ async function refill() {
     model = r.model;
     if (r.final && !final) {
       final = true;
-      document.querySelector("header h1").textContent = "Final pass: which would you print?";
+      document.querySelector("header h1").textContent = "Final pass: which might you print?";
     }
     const have = new Set(queue.map(i => i.sha1).concat(cur ? [cur.sha1] : []));
     queue.push(...r.items.filter(i => !have.has(i.sha1)));
@@ -134,10 +134,10 @@ function renderRate() {
   main.appendChild(el);
   $("prompt").textContent = {
     recheck: "Second look: you said soft/blurry before, on a smaller image",
-    final: "You said maybe: print it (Y), keep as backup (M), or drop (N)?",
-  }[cur.source] || (final ? "Not rated yet: print it (Y), keep as backup (M), or drop (N)?" : "");
+    final: "You said maybe: maybe print (Y), keep as backup (M), or drop (N)?",
+  }[cur.source] || (final ? "Not rated yet: maybe print (Y), keep as backup (M), or drop (N)?" : "");
   const c = $("controls"); c.innerHTML = "";
-  const [ly, lm, ln] = final ? ["Print it", "Backup", "Drop"] : ["Yes", "Maybe", "No"];
+  const [ly, lm, ln] = final ? ["Maybe print", "Backup", "Drop"] : ["Yes", "Maybe", "No"];
   c.append(button(`${ly} (Y)`, "yes", () => rate("yes")), button(`${lm} (M)`, "maybe", () => rate("maybe")),
            button(`${ln} (N)`, "no", () => rate("no")));
   const sep = document.createElement("span"); sep.className = "sep"; c.append(sep);

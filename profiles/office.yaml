@@ -56,6 +56,10 @@ concepts:                 # CLIP prompt ensembles, each scored against a neutral
 subject_concepts: [landscape, animal, texture]
 subject_partial: {architecture: 0.7}   # neutral-ish: partial subject credit
 
+# 2026-11-07: you asked to prefer the Canon over the phone. In the ratings so far, Canon
+# photos were liked 38% of the time vs 25% (Pixel), 17% (iPhone).
+preferred_cameras: [Canon]
+
 taste: {positive: 0.5, C: 0.003, ignore_reasons: [soft]}   # learned from your ratings; "maybe" counts as a yes
 
 # 2026-11-06, after 202 ratings: the learned taste predicts held-out ratings much better
@@ -80,3 +84,4 @@ metrics:
   people:     {scale: raw, kind: down, lo: 0.02, hi: 0.15, weight: 1.5}  # largest person, fraction of frame
   portrait:   {source: concept_portrait, scale: raw, kind: down, lo: 0.4, hi: 0.9, weight: 1.0}
   megapixels: {scale: raw, kind: up, lo: 4, hi: 10, weight: 0.7}
+  camera:     {scale: raw, kind: up, lo: 0, hi: 1, eps: 0.5, weight: 1.0}  # preferred_cameras above; others get 0.5
