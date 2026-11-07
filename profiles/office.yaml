@@ -3,11 +3,13 @@
 # large-scale structure that reads from a distance, sharp somewhere.
 # Not wanted: prominent faces, individuals or small groups (crowds / distant figures are fine),
 # sunsets and similar cliches, photos of someone else's art, junk.
+# (The ratings later overruled the last two: see the note above `metrics`.)
 #
 # Each metric: source column (see profile.metric_values), scale (percentile | raw),
 # kind (up = more is better, down = less is better), ramp lo..hi, floor eps, weight.
 # A "must not be bad" metric saturates at 1 once adequate (only deficiency is penalized).
 name: office
+question: "Would you hang this in the office?"
 p: 0                      # nominal power-mean exponent (0 = geometric mean)
 eps: 0.05                 # desirability floor: a score, not a hard filter
 shortlist: 2000           # stage 1 -> stage 2 (expensive metrics on originals)
@@ -54,12 +56,19 @@ concepts:                 # CLIP prompt ensembles, each scored against a neutral
 subject_concepts: [landscape, animal, texture]
 subject_partial: {architecture: 0.7}   # neutral-ish: partial subject credit
 
+taste: {positive: 0.5, C: 0.003, ignore_reasons: [soft]}   # learned from your ratings; "maybe" counts as a yes
+
+# 2026-11-06, after 202 ratings: the learned taste predicts held-out ratings much better
+# (AUC 0.81) than the hand-built metrics (0.72). It is now the main metric, and the
+# hand-built ones stay only as guards for what was asked for up front (no prominent people,
+# printable size, sharp). Dropped because the ratings showed no signal (AUC ~0.5) or the
+# opposite: distance (0.48), cliche/sunset (0.46), indoor (0.51), art_junk (0.51; you liked
+# some paintings, mosaics and statues).
 metrics:
-  aesthetic:  {kind: up, weight: 1.0}                           # LAION, percentile
+  taste:      {kind: up, weight: 3.0}                           # CLIP probe on your ratings, percentile
   iaa:        {kind: up, weight: 0.5}                           # TOPIQ aesthetic, percentile
+  subject:    {scale: raw, kind: up, lo: 0.3, hi: 0.9, eps: 0.2, weight: 0.5}
   quality:    {source: iqa, kind: up, lo: 0.05, hi: 0.40, weight: 0.7}   # technical: only the bottom penalized
-  subject:    {scale: raw, kind: up, lo: 0.3, hi: 0.9, eps: 0.2, weight: 1.0}
-  distance:   {kind: up, weight: 1.0}                           # reads from across a room
   focus:                                                        # some part sharp at print scale
     source: focus
     scale: raw
@@ -70,7 +79,4 @@ metrics:
     fallback: {source: focus_proxy, scale: percentile, lo: 0.05, hi: 0.40}
   people:     {scale: raw, kind: down, lo: 0.02, hi: 0.15, weight: 1.5}  # largest person, fraction of frame
   portrait:   {source: concept_portrait, scale: raw, kind: down, lo: 0.4, hi: 0.9, weight: 1.0}
-  indoor:     {source: concept_interior, scale: raw, kind: down, lo: 0.5, hi: 0.9, weight: 0.7}
-  cliche:     {source: concept_sunset, scale: raw, kind: down, lo: 0.5, hi: 0.95, eps: 0.3, weight: 0.5}
-  art_junk:   {scale: raw, kind: down, lo: 0.3, hi: 0.8, weight: 1.0}
   megapixels: {scale: raw, kind: up, lo: 4, hi: 10, weight: 0.7}

@@ -35,5 +35,8 @@ Paths live in `config.yaml`.
 .venv/bin/python -m photosel ingest            # index + thumbnails + cheap stats
 .venv/bin/python -m photosel stats             # summary of what is in the DB
 .venv/bin/python -m photosel sheet --sample 40 # numbered contact sheets for review
+.venv/bin/python -m photosel review office    # local rating page, http://localhost:8765
+.venv/bin/python -m photosel review office --final   # final pass over your maybes: print / backup / drop
+.venv/bin/python -m photosel profile office   # rescore (refits the taste model on the ratings)
 .venv/bin/python -m pytest -q
 ```

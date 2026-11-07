@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rate photos: __PROFILE__</title>
+<style>
+  :root {
+    --bg: #161616; --panel: #222; --fg: #e8e8e8; --dim: #9a9a9a;
+    --yes: #3fae5a; --maybe: #d8a536; --no: #d0504a; --accent: #6aa0e0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; gap: 16px; align-items: baseline; padding: 8px 16px; background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .stats { color: var(--dim); }
+  header .help { margin-left: auto; color: var(--dim); font-size: 12px; }
+  kbd { background: #333; border: 1px solid #444; border-radius: 3px; padding: 0 4px; font: 12px ui-monospace, monospace; color: var(--fg); }
+  main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px; }
+  main img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  main.zoom { display: block; overflow: auto; cursor: grab; padding: 0; }
+  main.zoom img { max-width: none; max-height: none; margin: auto; }
+  main.zoom.drag { cursor: grabbing; }
+  main.fit img { cursor: zoom-in; }
+  .pair { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; border-radius: 6px; }
+  .pair:hover { background: #1e1e1e; }
+  .pair img { max-height: calc(100% - 24px); }
+  .pair .lab { color: var(--dim); margin-top: 4px; }
+  .controls { display: flex; gap: 8px; justify-content: center; padding: 8px 16px; flex-wrap: wrap; }
+  button { background: #2b2b2b; color: var(--fg); border: 1px solid #444; border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: #777; }
+  button.yes { border-color: var(--yes); } button.maybe { border-color: var(--maybe); } button.no { border-color: var(--no); }
+  .sep { width: 16px; }
+  .prompt { text-align: center; color: var(--dim); padding-top: 4px; min-height: 20px; }
+  footer { background: var(--panel); padding: 6px 16px 8px; }
+  footer .title { color: var(--dim); font-size: 12px; margin-bottom: 4px; }
+  .strip { display: flex; gap: 8px; overflow-x: auto; }
+  .card { flex: 0 0 120px; font-size: 11px; color: var(--dim); }
+  .card img { width: 120px; height: 80px; object-fit: cover; border: 3px solid #444; border-radius: 4px; display: block; }
+  .card.yes img { border-color: var(--yes); } .card.maybe img { border-color: var(--maybe); } .card.no img { border-color: var(--no); }
+  .card .you { color: var(--fg); }
+  .empty { color: var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>__QUESTION__</h1>
+  <span class="stats" id="stats">loading…</span>
+  <span class="help">
+    <kbd>Y</kbd> yes <kbd>M</kbd> maybe <kbd>N</kbd> no ·
+    no because: <kbd>P</kbd> people <kbd>B</kbd> boring <kbd>S</kbd> soft <kbd>C</kbd> cluttered
+    <kbd>D</kbd> weak from a distance <kbd>J</kbd> junk ·
+    <kbd>K</kbd> not here, but save for a personal set · <kbd>Z</kbd> undo ·
+    <kbd>F</kbd> or click: full resolution (drag to pan)
+  </span>
+</header>
+<main id="main"><span class="empty">loading…</span></main>
+<div class="prompt" id="prompt"></div>
+<div class="controls" id="controls"></div>
+<footer>
+  <div class="title">Just rated: your answer (border) and what the pipeline had decided</div>
+  <div class="strip" id="strip"></div>
+</footer>
+<script>
+const PROFILE = "__PROFILE__";
+const REASONS = __REASONS__;
+const KEYS = { y: ["yes"], m: ["maybe"], n: ["no"], p: ["no", "people"], b: ["no", "boring"],
+               s: ["no", "soft"], c: ["no", "cluttered"], d: ["no", "distance"], j: ["no", "junk"],
+               k: ["no", "personal"] };
+const PAIR_EVERY = 12;
+
+let queue = [], cur = null, mode = "rate", history = [], sincePair = 0, fetching = false, model = false,
+    final = false;
+const $ = id => document.getElementById(id);
+const DPR = window.devicePixelRatio || 1;
+// ask for images as large as the screen area they fill, in device pixels
+const EDGE = Math.ceil(Math.max($("main").clientWidth, $("main").clientHeight) * DPR);
+let zoomed = false;
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify(body) } : {});
+  return r.json();
+}
+
+function showStats(s) {
+  const t = s.total, n = t.yes + t.maybe + t.no;
+  $("stats").textContent = `${n} rated (yes ${t.yes} · maybe ${t.maybe} · no ${t.no}) · ${s.pairs} pairs` +
+    (model ? " · learning from your ratings" : (n < 30 ? ` · learning starts at 30` : ""));
+}
+
+async function refill() {
+  if (fetching || queue.length > 5) return;
+  fetching = true;
+  try {
+    const r = await api(`/api/next?n=20&refit=1`);
+    model = r.model;
+    if (r.final && !final) {
+      final = true;
+      document.querySelector("header h1").textContent = "Final pass: which would you print?";
+    }
+    const have = new Set(queue.map(i => i.sha1).concat(cur ? [cur.sha1] : []));
+    queue.push(...r.items.filter(i => !have.has(i.sha1)));
+  } finally { fetching = false; }
+  prefetch();
+}
+
+function prefetch() {
+  for (const it of queue.slice(0, 3)) { const im = new Image(); im.src = `/view/${it.sha1}?edge=${EDGE}`; }
+}
+
+function img(sha1) {
+  // thumbnail at once, swapped for the screen-sized original when it has loaded
+  const el = document.createElement("img");
+  el.src = `/thumb/${sha1}`;
+  const big = new Image();
+  big.onload = () => { el.src = big.src; };
+  big.src = `/view/${sha1}?edge=${EDGE}`;
+  return el;
+}
+
+function button(label, cls, fn) {
+  const b = document.createElement("button");
+  b.textContent = label; if (cls) b.className = cls; b.onclick = fn; return b;
+}
+
+function renderRate() {
+  mode = "rate"; zoomed = false;
+  const main = $("main"); main.innerHTML = ""; main.className = "fit";
+  if (!cur) { main.innerHTML = '<span class="empty">Nothing left to rate.</span>'; return; }
+  const el = img(cur.sha1); el.onclick = toggleZoom;
+  main.appendChild(el);
+  $("prompt").textContent = {
+    recheck: "Second look: you said soft/blurry before, on a smaller image",
+    final: "You said maybe: print it (Y), keep as backup (M), or drop (N)?",
+  }[cur.source] || (final ? "Not rated yet: print it (Y), keep as backup (M), or drop (N)?" : "");
+  const c = $("controls"); c.innerHTML = "";
+  const [ly, lm, ln] = final ? ["Print it", "Backup", "Drop"] : ["Yes", "Maybe", "No"];
+  c.append(button(`${ly} (Y)`, "yes", () => rate("yes")), button(`${lm} (M)`, "maybe", () => rate("maybe")),
+           button(`${ln} (N)`, "no", () => rate("no")));
+  const sep = document.createElement("span"); sep.className = "sep"; c.append(sep);
+  for (const [k, v] of Object.entries(KEYS))
+    if (v[1]) c.append(button(`${REASONS[v[1]]} (${k.toUpperCase()})`, v[0], () => rate(v[0], v[1])));
+  c.append(button("Undo (Z)", "", undo));
+}
+
+async function next() {
+  if (!final && sincePair >= PAIR_EVERY) {
+    sincePair = 0;
+    const p = await api("/api/pair");
+    if (p) return renderPair(p);
+  }
+  if (!queue.length) await refill();
+  cur = queue.shift() || null;
+  renderRate();
+  refill();
+  prefetch();
+}
+
+function renderPair(p) {
+  mode = "pair"; cur = p; zoomed = false;
+  const main = $("main"); main.innerHTML = ""; main.className = "";
+  for (const [side, key] of [["a", "←"], ["b", "→"]]) {
+    const d = document.createElement("div"); d.className = "pair";
+    d.appendChild(img(p[side].sha1));
+    const l = document.createElement("div"); l.className = "lab"; l.textContent = key; d.appendChild(l);
+    d.onclick = () => choose(side);
+    main.appendChild(d);
+  }
+  $("prompt").textContent = "Which would you rather hang?";
+  const c = $("controls"); c.innerHTML = "";
+  c.append(button("Left (←)", "", () => choose("a")), button("Can't choose (↓)", "", () => choose("=")),
+           button("Right (→)", "", () => choose("b")), button("Undo (Z)", "", undo));
+}
+
+function toggleZoom() {
+  if (mode !== "rate" || !cur) return;
+  if (zoomed) return renderRate();
+  zoomed = true;
+  const main = $("main"); main.className = "zoom"; main.innerHTML = "";
+  $("prompt").textContent = "Loading full resolution…";
+  const sha1 = cur.sha1, el = new Image();
+  el.onload = () => {
+    if (!zoomed || cur.sha1 !== sha1) return;
+    el.style.width = (el.naturalWidth / DPR) + "px";      // one image pixel per screen pixel
+    main.appendChild(el);
+    main.scrollLeft = (main.scrollWidth - main.clientWidth) / 2;
+    main.scrollTop = (main.scrollHeight - main.clientHeight) / 2;
+    $("prompt").textContent = `Full resolution (${el.naturalWidth}×${el.naturalHeight}): drag to pan, F or click to fit`;
+  };
+  el.onerror = () => { $("prompt").textContent = "Could not load the original"; };
+  el.src = `/full/${sha1}`;
+}
+
+let drag = null;
+$("main").addEventListener("mousedown", e => {
+  if (!zoomed) return;
+  drag = { x: e.clientX, y: e.clientY, l: $("main").scrollLeft, t: $("main").scrollTop, moved: false };
+  $("main").classList.add("drag"); e.preventDefault();
+});
+window.addEventListener("mousemove", e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+  $("main").scrollLeft = drag.l - dx; $("main").scrollTop = drag.t - dy;
+});
+window.addEventListener("mouseup", () => {
+  if (!drag) return;
+  const moved = drag.moved; drag = null; $("main").classList.remove("drag");
+  if (!moved) toggleZoom();                               // a click (not a drag) goes back to fit
+});
+
+async function rate(rating, reason = null) {
+  if (mode !== "rate" || !cur) return;
+  const it = cur;
+  history.push({ kind: "rate", item: it, rating, reason });
+  sincePair++;
+  addCard(it, rating, reason);
+  next();
+  showStats(await api("/api/rate", { sha1: it.sha1, rating, reason, source: it.source }));
+}
+
+async function choose(w) {
+  if (mode !== "pair") return;
+  const p = cur;
+  history.push({ kind: "pair", pair: p, winner: w });
+  next();
+  showStats(await api("/api/pair", { a: p.a.sha1, b: p.b.sha1, winner: w }));
+}
+
+async function undo() {
+  const h = history.pop();
+  if (!h) return;
+  if (h.kind === "rate") {
+    if (mode === "rate" && cur) queue.unshift(cur);
+    cur = h.item; sincePair = Math.max(0, sincePair - 1);
+    $("strip").firstChild?.remove();
+    renderRate();
+    showStats(await api("/api/rate", { sha1: h.item.sha1, rating: null, source: h.item.source }));
+  } else {
+    if (mode === "rate" && cur) queue.unshift(cur);
+    renderPair(h.pair);
+    showStats(await api("/api/pair", { a: h.pair.a.sha1, b: h.pair.b.sha1, winner: null }));
+  }
+}
+
+function addCard(it, rating, reason) {
+  const d = document.createElement("div"); d.className = `card ${rating}`;
+  const im = document.createElement("img"); im.src = `/thumb/${it.sha1}`; d.appendChild(im);
+  const you = document.createElement("div"); you.className = "you";
+  you.textContent = "you: " + rating + (reason ? ` (${REASONS[reason]})` : "");
+  const sys = document.createElement("div"); sys.textContent = "pipeline: " + it.verdict;
+  d.append(you, sys);
+  $("strip").prepend(d);
+  while ($("strip").children.length > 30) $("strip").lastChild.remove();
+}
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === "z" || k === "backspace") { e.preventDefault(); return undo(); }
+  if (k === "f") { e.preventDefault(); return toggleZoom(); }
+  if (mode === "pair") {
+    if (k === "arrowleft") return choose("a");
+    if (k === "arrowright") return choose("b");
+    if (k === "arrowdown") return choose("=");
+    return;
+  }
+  if (KEYS[k]) { e.preventDefault(); rate(...KEYS[k]); }
+});
+
+(async () => {
+  showStats(await api("/api/stats"));
+  await refill();
+  next();
+})();
+</script>
+</body>
+</html>

@@ -144,14 +144,20 @@ def candidates(con) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
-def metric_values(df: pd.DataFrame, emb: dict, prof: dict, cache: Path) -> pd.DataFrame:
-    """Raw value of every metric named in the profile (NaN where not computed)."""
+def metric_values(df: pd.DataFrame, emb: dict, prof: dict, cache: Path, taste=None) -> pd.DataFrame:
+    """Raw value of every metric named in the profile (NaN where not computed).
+
+    `taste` is a fitted model from taste.fit_taste (None: the taste metric is neutral).
+    """
+    from .taste import predict
+
     E = np.stack([emb[s] for s in df["sha1"]])
     concepts = concept_probs(E, prof.get("concepts", {}), cache)
     labels = label_probs(E, DEFAULT_LABELS, cache)
     junk = sum(v for k, v in labels.items() if k.startswith("junk_"))
     pct = percentile
     m = pd.DataFrame(index=df.index)
+    m["taste"] = predict(taste, emb, df["sha1"].tolist())
     m["aesthetic"] = df["aesthetic"]
     m["iaa"] = df["iaa"]
     m["iqa"] = df["iqa"]
@@ -223,10 +229,24 @@ def run_profile(cfg: Config, name: str, stage2: bool = True) -> dict:
     df = candidates(con)
     df = df[df["sha1"].isin(emb)].reset_index(drop=True)
     cache = cfg.work_dir / "models" / "text_emb.npz"
+    from .taste import fit_taste
+
+    tcfg = prof.get("taste", {})
+    taste = fit_taste(con, prof["name"], emb, tcfg.get("positive", 0.5), tcfg.get("C", 0.01),
+                      tcfg.get("ignore_reasons", ["soft"]))
+    try:
+        rated = dict(con.execute("SELECT sha1, rating FROM ratings WHERE profile=?", (prof["name"],)))
+    except Exception:  # noqa: BLE001  (no ratings table yet)
+        rated = {}
+    pos = tcfg.get("positive", 0.5)
+    rated_no = {s for s, v in rated.items() if v < pos}
+    rated_yes = {s for s, v in rated.items() if v >= pos}
     con.close()
+    sources = {spec.get("source", n) for n, spec in prof["metrics"].items()} | \
+              {spec["fallback"]["source"] for spec in prof["metrics"].values() if spec.get("fallback")}
 
     # Stage 1: everything, cheap metrics.
-    m = metric_values(df, emb, prof, cache)
+    m = metric_values(df, emb, prof, cache, taste)
     D = desirabilities(m, prof)
     n_short = prof.get("shortlist", 2000)
     nominal, ptop = _score(D, prof, n_short)
@@ -239,13 +259,15 @@ def run_profile(cfg: Config, name: str, stage2: bool = True) -> dict:
         from .embed import run_small_aesthetic
         from .structure import run_focus
         ids = df.loc[short, "sha1"].tolist()
-        run_focus(cfg, ids)
-        run_small_aesthetic(cfg, ids)
+        if "focus" in sources:
+            run_focus(cfg, ids)
+        if "distance" in sources:
+            run_small_aesthetic(cfg, ids)
         con = connect(cfg.db_path)
         df = candidates(con)
         con.close()
         df = df[df["sha1"].isin(emb)].reset_index(drop=True)
-        m = metric_values(df, emb, prof, cache)
+        m = metric_values(df, emb, prof, cache, taste)
         short_ids = set(ids)
         is_short = df["sha1"].isin(short_ids).to_numpy()
         D = desirabilities(m, prof)          # percentiles still over the whole pool for stage-1 metrics
@@ -262,6 +284,8 @@ def run_profile(cfg: Config, name: str, stage2: bool = True) -> dict:
 
     # Diverse final pick among the best (by MC probability, ties by nominal score).
     rank_score = np.nan_to_num(ptop) + 1e-3 * np.nan_to_num(nominal)
+    rank_score[df["sha1"].isin(rated_no).to_numpy()] = -1.0      # you said no: never selected
+    rank_score[df["sha1"].isin(rated_yes).to_numpy()] += 2.0     # you said maybe/yes: picked first
     pool = np.argsort(-rank_score)[: prof.get("target", 300) * 3]
     Ep = np.stack([emb[s] for s in df.loc[pool, "sha1"]])
     div = prof.get("diversity", {})
@@ -282,5 +306,5 @@ def run_profile(cfg: Config, name: str, stage2: bool = True) -> dict:
     con.commit()
     con.close()
     sel = [i for i in df.index if selected[i] is not None]
-    return dict(profile=prof["name"], candidates=len(df), shortlist=int((stage == 2).sum()), selected=len(sel),
+    return dict(profile=prof["name"], taste_model=taste is not None, candidates=len(df), shortlist=int((stage == 2).sum()), selected=len(sel),
                 weakest_among_selected=pd.Series(weakest[sel]).value_counts().to_dict())

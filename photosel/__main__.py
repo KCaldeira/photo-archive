@@ -32,6 +32,14 @@ def main(argv=None):
     p.add_argument("name")
     p.add_argument("--stage1-only", action="store_true", help="skip the expensive shortlist metrics")
 
+    p = sub.add_parser("review", help="local rating page (http://localhost:8765)")
+    p.add_argument("profile", nargs="?", default="office")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--recheck", nargs="*", metavar="REASON",
+                   help="first show again the photos you rejected for these reasons (e.g. soft)")
+    p.add_argument("--final", action="store_true",
+                   help="final pass over your maybes: Y print, M backup, N drop; then the best unrated")
+
     sub.add_parser("rank", help="filters, bursts, events, composite score, finalists (fast)")
 
     sub.add_parser("stats", help="summarize the database")
@@ -65,6 +73,9 @@ def main(argv=None):
     elif a.cmd == "profile":
         from .profile import run_profile
         print(json.dumps(run_profile(cfg, a.name, stage2=not a.stage1_only), indent=2, default=str))
+    elif a.cmd == "review":
+        from .review import serve
+        serve(cfg, a.profile, port=a.port, recheck=a.recheck, final=a.final)
     elif a.cmd == "rank":
         from .rank import run_rank
         print(json.dumps(run_rank(cfg, cfg.rank), indent=2))
